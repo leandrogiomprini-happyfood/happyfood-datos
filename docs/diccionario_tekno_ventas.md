@@ -11,18 +11,22 @@ Estados: **confirmado** (lo validó Cuci o un comprobante real) · **probable** 
 
 ## Tipos de comprobante (CODICOMP)
 
-| Código | Cantidad | Significado | Estado |
-| --- | --- | --- | --- |
-| F2 | 2.950 | Factura | a confirmar letra / talonario |
-| P2 | 1.428 | Presupuesto (no fiscal, sin CAE) | confirmado (P2 1048 del 22/10) |
-| C2 | 625 | Nota de crédito | a confirmar |
-| F7 | 484 | ¿Factura de crédito electrónica MiPyME? | a confirmar |
-| C7 | 193 | ¿Nota de crédito de FCE? | a confirmar |
-| A2 / A1 / A3 / A4 | 68 / 65 / 1 / 1 | ? | a confirmar |
-| F1 | 53 | Factura (otro talonario) | a confirmar |
-| Q2 | 37 | ? | a confirmar |
-| D2 | 25 | Nota de débito | a confirmar |
-| C1, C5, F3, F8, I2 | 1–3 c/u | ? | a confirmar |
+Confirmados por Cuci el 24/10/2026. La tabla de Tekno `TABLCOMP.DBF` tiene la descripción oficial y el código AFIP de cada uno: sincronizarla en la fase 1.
+
+| Código | Cantidad | Significado | Signo | Cuenta como venta |
+| --- | --- | --- | --- | --- |
+| F2 | 2.950 | Factura | + | sí |
+| P2 | 1.428 | Presupuesto (venta sin factura) | + | sí, no fiscal |
+| C2 | 625 | Nota de crédito | − | sí |
+| F7 | 484 | Factura de crédito electrónica | + | sí |
+| C7 | 193 | Nota de crédito (de FCE) | − | sí |
+| A2 | 68 | Ajuste de débito | + | no (solo cuenta corriente) |
+| A1 | 65 | Ajuste de crédito | − | no (solo cuenta corriente) |
+| F1 | 53 | Factura de contado / consumidor final | + | sí |
+| Q2 | 37 | Nota de crédito de un presupuesto | − | sí, no fiscal |
+| D2 | 25 | Nota de débito | + | sí |
+| C1 | 3 | Nota de crédito | − | sí |
+| F3, F8, C5, A3, A4, I2 | 1 c/u | Sin confirmar | 0 | no |
 
 ## Encabezado (MOVIVENT)
 
@@ -38,8 +42,11 @@ Estados: **confirmado** (lo validó Cuci o un comprobante real) · **probable** 
 | CODILIST | Lista de precios | probable |
 | CODIFOPA | Forma de pago | probable |
 | CODISIFI | Condición fiscal (CF, RI, ...) | probable |
-| NETOVENT / NGRAVENT / IMPUVENT / IMPOVENT | Importes: falta saber cuál es neto, gravado y total | a confirmar |
-| SALDVENT | Saldo pendiente de cobro | probable |
+| NETOVENT | Neto sin IVA | confirmado (FC 0003-00002526: 1.740.831,23) |
+| NGRAVENT | Neto gravado | confirmado (igual al neto en esa factura) |
+| IMPUVENT | IVA | confirmado (365.574,56) |
+| IMPOVENT | Total con IVA | confirmado (2.106.405,76) |
+| SALDVENT | Saldo pendiente de cobro | probable (igual al total en una factura impaga) |
 | NUMECAE / FEVECAE | CAE de AFIP y su vencimiento | probable |
 | FECHANUL / HORAANUL | Anulación | probable |
 | REMIVENT | Remito asociado | probable |
@@ -54,6 +61,6 @@ Estados: **confirmado** (lo validó Cuci o un comprobante real) · **probable** 
 | CANTFINA | Cantidad | probable |
 | PRECLIST | Precio de lista | probable |
 | BONIFINA | Bonificación % | probable |
-| NETOFINA | Neto de la línea. Algunos valores llegan como `****` (desborde del DBF) | confirmado el desborde |
+| NETOFINA | Neto de la línea. Algunos valores llegan como `****` (desborde del DBF) | confirmado: 3 de 29.547 líneas |
 | IMP1FINA / CODIIMP1 | Impuesto 1 y su código (05 ¿IVA 21%?) | a confirmar |
 | COSTFINA | Costo (viene en 0) | probable |

@@ -14,7 +14,7 @@ Get-ChildItem -Path $Origen -Filter *.dbf | Sort-Object Length -Descending | For
     $h = $br.ReadBytes(32)
     $registros = [BitConverter]::ToUInt32($h, 4)
     $largoReg = [BitConverter]::ToUInt16($h, 10)
-    $ultima = "{0:0000}-{1:00}-{2:00}" -f (1900 + $h[1]), $h[2], $h[3]
+    $ultima = "{0:0000}-{1:00}-{2:00}" -f (1900 + $h[1] + $(if ($h[1] -lt 50) {100} else {0})), $h[2], $h[3]
     $n = 0
     while ($true) {
       $d = $br.ReadBytes(32)
