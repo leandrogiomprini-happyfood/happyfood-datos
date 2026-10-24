@@ -16,7 +16,6 @@ la gran mayoría están vacías o sin uso desde hace años. Estas son las que se
 | Pagos | MOVIPAGO / DETAPAGO | 2.954 / 3.765 | Órdenes de pago y medios | 1 |
 | Pagos | APLICOMP | 5.405 | Qué pago canceló qué factura de compra | 1 |
 | Pagos | CHEQPAGO | 3.146 | Cheques emitidos | 2 |
-| Stock | MOVISTOK / DETASTOK / maesstok | 5.007 / 55.018 / 480 | Movimientos y stock por artículo y depósito (¿qué se carga hoy?) | a definir |
 | Maestros | MAESCLIE | 438 | Clientes, con CUIT, vendedor, lista, zona | 1 |
 | Maestros | MAESPROV | 420 | Proveedores, con CUIT y rubro | 1 |
 | Maestros | MAESARTI | 200 | Artículos | 1 |
@@ -25,7 +24,7 @@ la gran mayoría están vacías o sin uso desde hace años. Estas son las que se
 | Tablas | TABLCOMP, TABLVEND, TABLLIST, TABLFOPA, TABLRUBR, TABLSIFI, TABLTRAN, TABLIMPU, TABLBANC | < 5.400 c/u | Descripciones de códigos | 1 |
 | Saldos | SALDCLIE / SALDPROV | 461 / 2.228 | Saldos por período | 2 |
 
-Fuera de alcance por ahora: CLIEPERC (percepciones, sin uso desde 2023), BORRADOS (2009), CONCCOMP
+Fuera de alcance por ahora: MOVISTOK / DETASTOK / maesstok (el stock de Tekno no se usa, confirmado el 24/10: el stock vive en Google Sheets; los movimientos que aparecen los genera Tekno solo al facturar), CLIEPERC (percepciones, sin uso desde 2023), BORRADOS (2009), CONCCOMP
 (233.628 renglones de texto), movipeve / DETAPEVE (pedidos de venta, sin uso desde julio 2026), tesorería y caja (sin uso desde 2025).
 
 ## Diseño propuesto para sumarlas
