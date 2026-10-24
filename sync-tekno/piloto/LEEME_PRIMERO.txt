@@ -1,0 +1,59 @@
+HAPPY FOOD - SINCRONIZACION AUTOMATICA (Windows Server 2008 R2)
+VERSION: 1 PILOTO. NO ACTIVAR DIRECTAMENTE EN PRODUCCION.
+
+Basado en: HappyControlIncremental.cs, HappyEnviarLote.cs, HappyEnviarSerie.cs y CREAR_VSS.txt del ZIP recibido.
+
+OBJETIVO: ejecutar cada 10 minutos VSS -> copia DBF -> extractor CSV ->
+comparacion incremental -> lotes de hasta 100 -> Supabase -> actualizar base confirmada.
+
+PROTECCIONES:
+- No se modifica F: ni los DBF originales.
+- VSS se intenta eliminar desde DiskShadow por ID incluso ante fallos.
+- El proceso se bloquea si no puede identificar/limpiar VSS.
+- Mutex de archivo: no se permiten ejecuciones simultaneas.
+- No se sincroniza si el comparador ve IDs desaparecidos (posible PACK).
+- Identidad de registros existentes verificada contra BASE_CONFIRMADA.
+- No se envian lotes si antes hubo un fallo bloqueante.
+- HTTP confirmado y respuesta SQL verificada; sin reintentos automaticos.
+- Tras todos los lotes exitosos se avanza la BASE_CONFIRMADA.
+- Usar la misma cuenta Windows cuya DPAPI ya funciona.
+
+ATENCION:
+- Es un guardado incremental por POSICION DBF: un PACK que reutilice
+  la misma posicion y coincida accidentalmente la identidad comercial
+  no se detectara de forma infalible.
+- Nunca autorizar cambios directos de Supabase que deban sobrevivir al
+  proceso de Tecno como fuente unica.
+- El primer punto de referencia CSV_20261022 presupone que la
+  carga del 22/10 quedo confirmada en Supabase, tal como se verifico.
+- La version de prueba presupone que no hay otras herramientas que usen X:.
+- El archivo NO_EJECUTAR_AUN_07_INSTALAR_TAREA requiere credenciales
+  Windows ingresadas LOCALMENTE y no tiene garantias sobre politicas de
+  cuenta, logon batch ni carga de perfil hasta probarlo de verdad.
+- Riesgo no resuelto: si una escritura queda confirmada en SQL pero la
+  respuesta se pierde, se bloquea y requiere conciliacion manual.
+- La comparacion de identidad de registros existentes solo cubre campos
+  claves ORDEVENT/CODICOMP/NUMEVENT y ORDEFINA/ORDECOMP; aun hay que
+  ensayar con PACK, cambios de esquema y escenarios de corte de energia.
+
+ETAPA INICIAL AHORA (SIN INTERNET NI ESCRITURA SUPABASE):
+1. Extraer este ZIP en C:\HAPPY_EXTRACTOR\SYNC.
+2. Ejecutar 01_COMPILAR_AUTO.bat.
+3. Ejecutar 02_PREPARAR_BASE_CONFIRMADA.bat (verifica SHA256 de ambos CSV del 22/10).
+4. Ejecutar 03_PROBAR_CICLO_COMPLETO_SIN_ENVIO.bat en CMD admin.
+5. Enviar texto final y contenido de AUTO_ESTADO\EJECUCIONES\<ultima>\ejecucion.log.
+
+NO EJECUTAR AUN: archivos 05, 06 ni 07. La tarea NO se instala por extraer el ZIP.
+
+Tras revisarse la prueba local, avanzar en conjunto:
+- 05 autorizar, 06 probar escritura controlada nueva, conciliar SQL.
+- 07 instalar tarea, confirmar ejecucion autonomamente y estado ultimo resultado.
+- Configurar monitoreo/alertas operativas despues del piloto.
+
+CUANDO LA TAREA ESTE ACTIVA:
+- Nombre: HappyFood_Tekno_Supabase_10min
+- Detencion: schtasks /change /tn "HappyFood_Tekno_Supabase_10min" /disable
+- Reanudacion: schtasks /change /tn "HappyFood_Tekno_Supabase_10min" /enable
+- Inspeccion: schtasks /query /tn "HappyFood_Tekno_Supabase_10min" /v /fo list
+- Logs por ejecucion: C:\HAPPY_EXTRACTOR\SYNC\AUTO_ESTADO\EJECUCIONES
+- Si hay REQUIERE_REVISION.txt, NO borrar ni reintentar sin validar Supabase.

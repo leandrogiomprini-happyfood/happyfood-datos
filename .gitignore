@@ -1,0 +1,30 @@
+# Nunca subir credenciales ni datos comerciales
+*.env
+.env*
+*secret*
+*credencial*
+healthcheck_url.txt
+AUTORIZACION_AUTOMATICA.txt
+*.dpapi
+# Datos exportados de Tekno o planillas
+*.dbf
+*.DBF
+*.fpt
+*.FPT
+*.cdx
+*.CDX
+*.csv
+*.CSV
+*.xlsx
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+# Binarios y estado del sincronizador
+*.exe
+AUTO_ESTADO/
+EJECUCIONES/
+# Node / sistema
+node_modules/
+.DS_Store
+Thumbs.db
