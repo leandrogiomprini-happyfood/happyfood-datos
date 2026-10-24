@@ -1,0 +1,32 @@
+HAPPY FOOD - SINCRONIZADOR DE TABLAS DE TEKNO (HappyTablas.exe)
+
+QUE HACE
+- Cada 1 hora: instantanea VSS de F:, copia los DBF listados en tablas_tekno.txt, los pasa a CSV con
+  el mismo Extractor.exe, compara contra la ultima extraccion confirmada y envia solo lo nuevo o cambiado
+  a Supabase (tabla tekno.registros).
+- No toca las ventas: esas siguen con HappyAuto.exe cada 10 minutos. Comparten el candado
+  AUTO_ESTADO\en_ejecucion.lock, asi que nunca corren al mismo tiempo.
+- Si un envio falla por red, esa tabla no avanza y se reenvia en la proxima hora (la carga es idempotente).
+- Se bloquea (AUTO_TABLAS\REQUIERE_REVISION.txt) solo si sospecha PACK: registros que desaparecen,
+  columnas que cambian o un campo de identidad que cambia.
+
+ORDEN DE INSTALACION
+En Supabase:
+ 1. Editor SQL: ejecutar supabase/migrations/002_tekno_registros.sql
+ 2. Edge Functions > happyfood-sync: reemplazar el codigo por supabase/functions/happyfood-sync/index.ts y desplegar.
+    Despues confirmar que las ventas siguen llegando (Healthchecks de ventas en verde).
+En el servidor (copiar esta carpeta completa a C:\HAPPY_EXTRACTOR\SYNC, sin pisar nada de HappyAuto):
+ 3. T1_COMPILAR_TABLAS.bat
+ 4. T2_PROBAR_TABLAS_SIN_ENVIO.bat  -> mandar RESUMEN_CAMBIOS.txt de AUTO_TABLAS\EJECUCIONES\(ultima)
+ 5. T3_AUTORIZAR_TABLAS.bat
+ 6. T4_SINCRONIZAR_AHORA.bat        -> primera carga de la etapa 1
+ 7. En Supabase: select * from tekno.registros_resumen;
+ 8. Healthchecks: crear un aviso nuevo "Tekno tablas" (periodo 1 hora, tolerancia 30 min) y guardar su
+    URL en C:\HAPPY_EXTRACTOR\SYNC\AUTO_TABLAS\healthcheck_url.txt
+ 9. T5_INSTALAR_TAREA_TABLAS.bat
+10. Etapa 2: sacar los # de tablas_tekno.txt y correr T4 de nuevo (carga inicial de ~60.000 registros,
+    puede tardar 10-20 minutos; mientras tanto la tarea de ventas espera).
+
+DETENER / REANUDAR
+ schtasks /change /tn "HappyFood_Tekno_Tablas_1h" /disable
+ schtasks /change /tn "HappyFood_Tekno_Tablas_1h" /enable

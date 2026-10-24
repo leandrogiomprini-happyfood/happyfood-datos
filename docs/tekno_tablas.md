@@ -27,8 +27,11 @@ la gran mayoría están vacías o sin uso desde hace años. Estas son las que se
 Fuera de alcance por ahora: MOVISTOK / DETASTOK / maesstok (el stock de Tekno no se usa, confirmado el 24/10: el stock vive en Google Sheets; probable: los movimientos que aparecen los genera Tekno al facturar), CLIEPERC (percepciones, sin uso desde 2023), BORRADOS (2009), CONCCOMP
 (233.628 renglones de texto), movipeve / DETAPEVE (pedidos de venta, sin uso desde julio 2026), tesorería y caja (sin uso desde 2025).
 
-## Diseño propuesto para sumarlas
+## Cómo se suman (implementado el 24/10/2026)
 
-Una sola tabla genérica en Supabase, `tekno.registros (tabla, registro_origen, datos, eliminado_origen, fecha_sincronizacion)`
-con clave `(tabla, registro_origen)`, y una vista por tabla. El sincronizador lee una lista de tablas desde un archivo de
-configuración en vez de tenerlas fijas en el código. Agregar una tabla nueva pasa a ser sumar una línea a esa lista.
+- Supabase: tabla genérica `tekno.registros (tabla, registro_origen, datos, eliminado_origen, fecha_sincronizacion)`
+  y lista `tekno.tablas_permitidas` (migración `002_tekno_registros.sql`). La función `tekno.sincronizar_registros`
+  hace upsert idempotente; `tekno.sincronizar_lote` (ventas) no se modificó.
+- Edge Function: acción nueva `sincronizar_registros`; las acciones existentes quedan iguales.
+- Servidor: `sync-tekno/tablas/HappyTablas.exe`, tarea aparte cada 1 hora, lista de tablas en `tablas_tekno.txt`.
+  Comparte candado con `HappyAuto.exe`. Instalación paso a paso en `LEEME_TABLAS.txt`.

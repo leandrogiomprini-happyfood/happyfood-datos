@@ -1,0 +1,33 @@
+# Happy Food - tablas de Tekno que sincroniza HappyTablas.exe (ventas NO van aca: las maneja HappyAuto.exe)
+# Formato: tabla|ARCHIVO.DBF|CAMPOS_DE_IDENTIDAD
+#   tabla: nombre en Supabase (tiene que existir en tekno.tablas_permitidas)
+#   campos de identidad: si cambian en un registro ya enviado, se sospecha PACK y el proceso se bloquea
+# Lineas que empiezan con # no se procesan.
+
+# ---- ETAPA 1: tablas de codigos y maestros (chicas) ----
+tablcomp|TABLCOMP.DBF|ORDECOMP
+tablvend|TABLVEND.DBF|ORDEVEND
+tabllist|TABLLIST.DBF|ORDELIST
+tablfopa|TABLFOPA.DBF|ORDEFOPA
+tablrubr|TABLRUBR.DBF|ORDERUBR
+tablsifi|TABLSIFI.DBF|ORDESIFI
+tabltran|TABLTRAN.DBF|ORDETRAN
+tablimpu|TABLIMPU.DBF|ORDEIMPU
+maescuen|MAESCUEN.DBF|ORDECUEN
+maesclie|MAESCLIE.DBF|ORDECLIE
+maesprov|MAESPROV.DBF|ORDEPROV
+maesarti|MAESARTI.DBF|ORDEARTI
+maesprec|MAESPREC.DBF|ORDEPREC
+
+# ---- ETAPA 2: cobranzas, compras y pagos (sacar el # cuando la etapa 1 este probada) ----
+#obsevent|OBSEVENT.DBF|ORDEDESC
+#auxivenc|AUXIVENC.DBF|ORDEVENT,ORDEVENC
+#movicobr|MOVICOBR.DBF|ORDECOBR,CODICOMP,NUMECOBR
+#detacobr|DETACOBR.DBF|ORDEPAGO,ORDECONC
+#auxiapli|AUXIAPLI.DBF|ORDEVENT,ORDECOBR
+#movicomp|MOVICOMP.DBF|ORDECOMP,CODICOMP,NUMECOMP
+#detacomp|DETACOMP.DBF|ORDECOMP,ORDEFINA
+#venccomp|VENCCOMP.DBF|ORDECOMP,ORDEVECO
+#movipago|MOVIPAGO.DBF|ORDEPAGO,CODICOMP,NUMEPAGO
+#detapago|DETAPAGO.DBF|ORDEPAGO,ORDECONC
+#aplicomp|APLICOMP.DBF|ORDECOMP,ORDEPAGO
