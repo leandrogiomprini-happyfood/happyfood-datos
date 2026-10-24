@@ -32,6 +32,6 @@ Fuera de alcance por ahora: MOVISTOK / DETASTOK / maesstok (el stock de Tekno no
 - Supabase: tabla genérica `tekno.registros (tabla, registro_origen, datos, eliminado_origen, fecha_sincronizacion)`
   y lista `tekno.tablas_permitidas` (migración `002_tekno_registros.sql`). La función `tekno.sincronizar_registros`
   hace upsert idempotente; `tekno.sincronizar_lote` (ventas) no se modificó.
-- Edge Function: acción nueva `sincronizar_registros`; las acciones existentes quedan iguales.
+- Edge Function nueva y separada, `happyfood-sync-tablas` (acción `sincronizar_registros`). La de ventas, `happyfood-sync`, no se modificó: su código en producción está en `supabase/referencia`.
 - Servidor: `sync-tekno/tablas/HappyTablas.exe`, tarea aparte cada 1 hora, lista de tablas en `tablas_tekno.txt`.
   Comparte candado con `HappyAuto.exe`. Instalación paso a paso en `LEEME_TABLAS.txt`.

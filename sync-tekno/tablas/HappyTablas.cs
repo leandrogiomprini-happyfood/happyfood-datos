@@ -32,7 +32,7 @@ class HappyTablas {
  const string Token="AUTORIZO_SYNC_TABLAS_TEKNO";
  const string ConfigFile=Sync+@"\tablas_tekno.txt";
  const string PingFile=State+@"\healthcheck_url.txt";
- const string Endpoint="https://igcewbadhejtesbogewm.supabase.co/functions/v1/happyfood-sync";
+ const string Endpoint="https://igcewbadhejtesbogewm.supabase.co/functions/v1/happyfood-sync-tablas";
  const string Extractor=Root+@"\happy_extractor_v1\Extractor.exe";
  const string Original=@"X:\TEKNO\ssoft.hap\DATOS\";
  const int MaxLote=100;

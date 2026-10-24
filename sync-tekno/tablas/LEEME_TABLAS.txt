@@ -13,8 +13,9 @@ QUE HACE
 ORDEN DE INSTALACION
 En Supabase:
  1. Editor SQL: ejecutar supabase/migrations/002_tekno_registros.sql
- 2. Edge Functions > happyfood-sync: reemplazar el codigo por supabase/functions/happyfood-sync/index.ts y desplegar.
-    Despues confirmar que las ventas siguen llegando (Healthchecks de ventas en verde).
+ 2. Edge Functions > Deploy a new function > nombre: happyfood-sync-tablas. Pegar el codigo de
+    supabase/functions/happyfood-sync-tablas/index.ts y desplegar. En su configuracion, dejar la
+    verificacion de JWT igual que en happyfood-sync. La funcion de ventas (happyfood-sync) NO se toca.
 En el servidor (copiar esta carpeta completa a C:\HAPPY_EXTRACTOR\SYNC, sin pisar nada de HappyAuto):
  3. T1_COMPILAR_TABLAS.bat
  4. T2_PROBAR_TABLAS_SIN_ENVIO.bat  -> mandar RESUMEN_CAMBIOS.txt de AUTO_TABLAS\EJECUCIONES\(ultima)
