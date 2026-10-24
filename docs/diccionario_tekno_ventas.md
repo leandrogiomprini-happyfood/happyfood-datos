@@ -64,3 +64,11 @@ Confirmados por Cuci el 24/10/2026. La tabla de Tekno `TABLCOMP.DBF` tiene la de
 | NETOFINA | Neto de la línea. Algunos valores llegan como `****` (desborde del DBF) | confirmado: 3 de 29.547 líneas |
 | IMP1FINA / CODIIMP1 | Impuesto 1 y su código (05 ¿IVA 21%?) | a confirmar |
 | COSTFINA | Costo (viene en 0) | probable |
+
+## Signo en todos los circuitos (TABLCOMP)
+
+Desde la migración 003, el signo de compras sale de la propia tabla de Tekno: `TIPOCOMP` es el circuito
+(V ventas, C compras, O cobranzas, P pagos) y `STIPCOMP` es débito (D) o crédito (C).
+En compras, crédito suma deuda con el proveedor (+1: FA, FB, FC, DA, DB) y débito resta (−1: CA, CB, CC).
+`TF` = transferencia bancaria (932 comprobantes): cuenta en la cuenta corriente del proveedor, pero no como compra/gasto
+hasta confirmar qué se registra con ese código. Recibos de cobranza: `R1`. Pagos: `OP` (orden de pago), `RA` / `RB` (recibos).
