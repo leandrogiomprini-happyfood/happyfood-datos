@@ -16,6 +16,7 @@ using System.Web.Script.Serialization;
 // Windows Server 2008 R2, .NET Framework 4.x. Nunca modifica Tekno (lee una instantanea VSS).
 // Convive con HappyAuto.exe (ventas): comparten el mismo candado, nunca corren a la vez.
 //
+// Lee los DBF por su cuenta (Extractor.exe solo procesa las tablas de ventas).
 // Diferencias con HappyAuto:
 //  - La lista de tablas sale de tablas_tekno.txt (una linea por tabla), no del codigo.
 //  - La carga en Supabase es idempotente (upsert por tabla + registro_origen): si un lote
@@ -33,7 +34,6 @@ class HappyTablas {
  const string ConfigFile=Sync+@"\tablas_tekno.txt";
  const string PingFile=State+@"\healthcheck_url.txt";
  const string Endpoint="https://igcewbadhejtesbogewm.supabase.co/functions/v1/happyfood-sync-tablas";
- const string Extractor=Root+@"\happy_extractor_v1\Extractor.exe";
  const string Original=@"X:\TEKNO\ssoft.hap\DATOS\";
  const int MaxLote=100;
  static string LogFile;
@@ -109,7 +109,6 @@ class HappyTablas {
  }
 
  static void Run(bool write,List<TablaConfig> tablas) {
-  if(!File.Exists(Extractor)) throw new Exception("Falta "+Extractor);
   string stamp=DateTime.Now.ToString("yyyyMMdd_HHmmss_fff");
   string run=Path.Combine(State,"EJECUCIONES",stamp);
   Directory.CreateDirectory(run); LogFile=Path.Combine(run,"ejecucion.log");
@@ -118,15 +117,13 @@ class HappyTablas {
   Log("INICIO modo="+(write?"SINCRONIZAR":"SOLO_PRUEBA")+" tablas="+tablas.Count+" run="+run);
 
   CopiarDesdeVss(tablas,dbfs);
-  RunProcess(Extractor,"\""+dbfs+"\" \""+csv+"\"",600000);
 
   // 1. Comparar todo antes de enviar nada.
   var pendientes=new List<KeyValuePair<TablaConfig,List<Dictionary<string,object>>>>();
   var resumen=new StringBuilder();
   foreach(var t in tablas) {
-   string nuevo=Path.Combine(csv,Path.GetFileNameWithoutExtension(t.Archivo)+".csv");
-   if(!File.Exists(nuevo)) throw new Exception("El extractor no genero "+nuevo);
-   Csv actual=Leer(nuevo);
+   Csv actual=LeerDbf(Path.Combine(dbfs,t.Archivo));
+   EscribirCsv(actual,Path.Combine(csv,t.Tabla+".csv"));
    foreach(string k in t.Claves) if(Array.IndexOf(actual.Cabecera,k)<0) throw new Exception(t.Tabla+": la clave "+k+" no existe en el DBF");
    string basePath=Path.Combine(BaseDir,t.Tabla+".csv");
    var cambios=new List<Dictionary<string,object>>();
@@ -160,7 +157,7 @@ class HappyTablas {
   int lotesTotales=0;
   foreach(var p in pendientes) {
    var t=p.Key; var cambios=p.Value;
-   string nuevo=Path.Combine(csv,Path.GetFileNameWithoutExtension(t.Archivo)+".csv");
+   string nuevo=Path.Combine(csv,t.Tabla+".csv");
    for(int i=0;i<cambios.Count;i+=MaxLote) {
     var lote=cambios.GetRange(i,Math.Min(MaxLote,cambios.Count-i));
     Send(t.Tabla,lote);
@@ -268,6 +265,79 @@ class HappyTablas {
    using(var resp=(HttpWebResponse)req.GetResponse()) {}
   } catch {}
  }
+
+ // ---- Lector de DBF (dBase / FoxPro, campos C, N, D y L) ----
+ // Mismo formato que Extractor.exe: texto con sus espacios, numeros como texto, fechas yyyy-MM-dd,
+ // registro_origen = posicion del registro (1, 2, 3...), eliminado_origen = marca de borrado '*'.
+ static Csv LeerDbf(string ruta) {
+  if(!File.Exists(ruta)) throw new Exception("Falta DBF copiado: "+ruta);
+  byte[] b=File.ReadAllBytes(ruta);
+  if(b.Length<33) throw new Exception("DBF demasiado chico: "+ruta);
+  int registros=BitConverter.ToInt32(b,4), largoHeader=BitConverter.ToUInt16(b,8), largoReg=BitConverter.ToUInt16(b,10);
+  Encoding enc=CodificacionDbf(b[29]);
+  var nombres=new List<string>(); var tipos=new List<char>(); var largos=new List<int>();
+  for(int pos=32; pos+32<=largoHeader && b[pos]!=0x0D; pos+=32) {
+   string n=Encoding.ASCII.GetString(b,pos,11).Split((char)0)[0].Trim();
+   char tipo=(char)b[pos+11];
+   if(tipo!='C'&&tipo!='N'&&tipo!='D'&&tipo!='L'&&tipo!='F') throw new Exception(Path.GetFileName(ruta)+": tipo de campo no soportado '"+tipo+"' en "+n);
+   nombres.Add(n); tipos.Add(tipo); largos.Add(b[pos+16]);
+  }
+  if(nombres.Count==0) throw new Exception(Path.GetFileName(ruta)+": sin campos");
+  if(1+largos.Sum()!=largoReg) throw new Exception(Path.GetFileName(ruta)+": el largo de registro no coincide con los campos");
+  if(registros<0||(long)largoHeader+(long)registros*largoReg>b.Length) throw new Exception(Path.GetFileName(ruta)+": archivo truncado o encabezado invalido");
+  var t=new Csv();
+  var cab=new List<string>{"registro_origen","eliminado_origen"}; cab.AddRange(nombres);
+  if(new HashSet<string>(cab,StringComparer.Ordinal).Count!=cab.Count) throw new Exception(Path.GetFileName(ruta)+": columnas repetidas");
+  t.Cabecera=cab.ToArray();
+  for(int r=0;r<registros;r++) {
+   int inicio=largoHeader+r*largoReg;
+   byte marca=b[inicio];
+   if(marca!=0x20&&marca!=0x2A) throw new Exception(Path.GetFileName(ruta)+": marca de borrado invalida en registro "+(r+1));
+   bool eliminado=marca==0x2A;
+   var datos=new Dictionary<string,string>(StringComparer.Ordinal);
+   var sb=new StringBuilder(); sb.Append(eliminado?'1':'0');
+   int off=inicio+1;
+   for(int f=0;f<nombres.Count;f++) {
+    string v=Valor(b,off,largos[f],tipos[f],enc);
+    datos.Add(nombres[f],v); sb.Append('|').Append(v.Length).Append(':').Append(v);
+    off+=largos[f];
+   }
+   t.Filas.Add(r+1,new Registro { Id=r+1, Eliminado=eliminado, Datos=datos, Firma=sb.ToString() });
+  }
+  return t;
+ }
+
+ static string Valor(byte[] b,int off,int largo,char tipo,Encoding enc) {
+  if(tipo=='C') return enc.GetString(b,off,largo).TrimEnd('\0');
+  string s=Encoding.ASCII.GetString(b,off,largo).TrimEnd('\0');
+  if(tipo=='D') {
+   string d=s.Trim();
+   if(d.Length==0) return "";
+   if(d.Length==8&&d.All(char.IsDigit)) return d.Substring(0,4)+"-"+d.Substring(4,2)+"-"+d.Substring(6,2);
+   return s;
+  }
+  return s; // N, F, L: texto tal cual (con espacios), igual que Extractor.exe
+ }
+
+ // Byte 29 del encabezado = pagina de codigos del DBF. Por defecto Windows-1252 (espanol).
+ static Encoding CodificacionDbf(byte ldid) {
+  int cp;
+  switch(ldid) { case 0x01: cp=437; break; case 0x02: cp=850; break; case 0x64: cp=852; break; default: cp=1252; break; }
+  return Encoding.GetEncoding(cp);
+ }
+
+ // Guarda una extraccion en CSV (todos los valores entre comillas) para usarla como base la proxima vez.
+ static void EscribirCsv(Csv t,string ruta) {
+  using(var w=new StreamWriter(ruta,false,new UTF8Encoding(false))) {
+   w.Write(String.Join(",",t.Cabecera.Select(Q).ToArray())); w.Write("\r\n");
+   foreach(var f in t.Filas.Values) {
+    var campos=new List<string>{Q(f.Id.ToString(CultureInfo.InvariantCulture)),Q(f.Eliminado?"True":"False")};
+    for(int i=2;i<t.Cabecera.Length;i++) campos.Add(Q(f.Datos[t.Cabecera[i]]));
+    w.Write(String.Join(",",campos.ToArray())); w.Write("\r\n");
+   }
+  }
+ }
+ static string Q(string v) { return "\""+v.Replace("\"","\"\"")+"\""; }
 
  // ---- Lectura del CSV del extractor (mismo formato y reglas que HappyControlIncremental) ----
  static Csv Leer(string ruta) {

@@ -1,8 +1,8 @@
 HAPPY FOOD - SINCRONIZADOR DE TABLAS DE TEKNO (HappyTablas.exe)
 
 QUE HACE
-- Cada 1 hora: instantanea VSS de F:, copia los DBF listados en tablas_tekno.txt, los pasa a CSV con
-  el mismo Extractor.exe, compara contra la ultima extraccion confirmada y envia solo lo nuevo o cambiado
+- Cada 1 hora: instantanea VSS de F:, copia los DBF listados en tablas_tekno.txt, los lee con su propio
+  lector de DBF (Extractor.exe solo sirve para ventas), compara contra la ultima extraccion confirmada y envia solo lo nuevo o cambiado
   a Supabase (tabla tekno.registros).
 - No toca las ventas: esas siguen con HappyAuto.exe cada 10 minutos. Comparten el candado
   AUTO_ESTADO\en_ejecucion.lock, asi que nunca corren al mismo tiempo.
