@@ -18,6 +18,7 @@ maesclie|MAESCLIE.DBF|ORDECLIE
 maesprov|MAESPROV.DBF|ORDEPROV
 maesarti|MAESARTI.DBF|ORDEARTI
 maesprec|MAESPREC.DBF|ORDEPREC
+maesgrcl|MAESGRCL.DBF|ORDEGRCL
 
 # ---- ETAPA 2: cobranzas, compras y pagos (activa desde el 24/10/2026) ----
 obsevent|OBSEVENT.DBF|ORDEDESC
