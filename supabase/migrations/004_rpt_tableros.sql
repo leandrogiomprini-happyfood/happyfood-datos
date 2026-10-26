@@ -1,4 +1,5 @@
 -- 004_rpt_tableros.sql
+-- ATENCION: desde el 26/10/2026 esta migracion fue reemplazada en parte por 005 (rpt materializado). No volver a ejecutarla.
 -- Vistas de reporte (esquema rpt) para Looker Studio y consultas con IA, y un usuario de solo lectura.
 -- Solo crea vistas y permisos: no modifica datos. Se puede volver a ejecutar sin riesgo.
 -- Requiere 001, 002 y 003.
