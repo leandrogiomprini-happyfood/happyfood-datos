@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Happy Food — Producción y stock</title>
+<style>
+  :root { color-scheme: light dark; }
+  .viz-root {
+    color-scheme: light;
+    --surface-1:#fcfcfb; --page:#f9f9f7;
+    --ink-1:#0b0b0b; --ink-2:#52514e; --ink-muted:#898781;
+    --grid:#e1e0d9; --baseline:#c3c2b7; --ring:rgba(11,11,11,0.10);
+    --s1:#2a78d6;
+    --st-good:#0ca30c; --st-warn:#fab219; --st-serious:#ec835a; --st-crit:#d03b3b;
+    --crit-tint:rgba(208,59,59,0.07); --excl-tint:rgba(137,135,129,0.12);
+    --good-text:#006300;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .viz-root {
+      color-scheme: dark;
+      --surface-1:#1a1a19; --page:#0d0d0d;
+      --ink-1:#ffffff; --ink-2:#c3c2b7; --ink-muted:#898781;
+      --grid:#2c2c2a; --baseline:#383835; --ring:rgba(255,255,255,0.10);
+      --s1:#3987e5;
+      --crit-tint:rgba(208,59,59,0.16); --excl-tint:rgba(137,135,129,0.18);
+      --good-text:#0ca30c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .viz-root { background: var(--page); color: var(--ink-1); min-height: 100vh; padding: 20px clamp(12px, 3vw, 36px) 60px; }
+  header.top { display:flex; flex-wrap:wrap; gap:12px; align-items:baseline; justify-content:space-between; margin-bottom:6px; }
+  h1 { font-size: 19px; margin: 0; font-weight: 650; }
+  .src { font-size: 12px; color: var(--ink-2); }
+  .conn { display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600; padding:3px 10px; border-radius:999px; border:1px solid var(--ring); }
+  .conn.live { color: var(--good-text); }
+  .conn.err { color: var(--st-crit); }
+  .conn.wait { color: var(--ink-muted); }
+  .conn .dot { width:8px; height:8px; border-radius:50%; background: currentColor; }
+  button.btn { font: inherit; font-size:12px; padding:5px 12px; border-radius:8px; border:1px solid var(--ring); background:var(--surface-1); color:var(--ink-1); cursor:pointer; }
+  button.btn:hover { border-color: var(--ink-muted); }
+  button.btn[disabled] { opacity:.5; cursor:default; }
+  button.btn.primary { border-color: var(--s1); color: var(--s1); font-weight:600; }
+  .tiles { display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:10px; margin:16px 0; }
+  .tile { background: var(--surface-1); border:1px solid var(--ring); border-radius:12px; padding:12px 14px; }
+  .tile .lbl { font-size:11px; color:var(--ink-2); text-transform:uppercase; letter-spacing:.4px; }
+  .tile .val { font-size:26px; font-weight:650; margin-top:2px; }
+  .tile .sub { font-size:11px; color:var(--ink-muted); margin-top:2px; }
+  .tile.crit .val { color: var(--st-crit); }
+  .tile.sim { border-color: var(--s1); }
+  .tile.sim .val { color: var(--s1); }
+  nav.tabs { display:flex; gap:6px; flex-wrap:wrap; margin: 10px 0 14px; }
+  nav.tabs button { font:inherit; font-size:13px; padding:7px 14px; border-radius:9px; border:1px solid var(--ring); background:transparent; color:var(--ink-2); cursor:pointer; }
+  nav.tabs button.on { background: var(--surface-1); color: var(--ink-1); font-weight:600; border-color: var(--ink-muted); }
+  .panel { background: var(--surface-1); border:1px solid var(--ring); border-radius:14px; padding:14px; }
+  .controls { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; align-items:center; }
+  .controls input, .controls select { font:inherit; font-size:13px; padding:6px 10px; border-radius:8px; border:1px solid var(--ring); background:var(--page); color:var(--ink-1); max-width:280px; }
+  table { border-collapse: collapse; width:100%; font-size: 12.5px; }
+  th { text-align:left; font-size:11px; color:var(--ink-2); text-transform:uppercase; letter-spacing:.3px; padding:7px 8px; border-bottom:1px solid var(--baseline); position:sticky; top:0; background:var(--surface-1); cursor:pointer; white-space:nowrap; }
+  td { padding:6px 8px; border-bottom:1px solid var(--grid); font-variant-numeric: tabular-nums; }
+  td.num, th.num { text-align:right; }
+  td.desc { max-width: 340px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink-2); }
+  tr.crit { background: var(--crit-tint); }
+  tr.derived td { color: var(--ink-muted); }
+  tr.excl td { background: var(--excl-tint); color: var(--ink-muted); text-decoration: line-through; }
+  tr.excl td.chk { text-decoration: none; }
+  input[type=checkbox] { width:16px; height:16px; accent-color: var(--s1); cursor:pointer; }
+  .badge { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:600; padding:2px 8px; border-radius:999px; white-space:nowrap; }
+  .b-crit { color:#fff; background: var(--st-crit); }
+  .b-insu { color:#5a2600; background: var(--st-serious); }
+  .b-ajus { color:#5a4300; background: var(--st-warn); }
+  .b-sufi { color:#fff; background: var(--st-good); }
+  .b-exce { color:var(--ink-1); border:1px solid var(--baseline); }
+  .b-mut  { color:var(--ink-muted); border:1px solid var(--grid); }
+  .b-porpedir { color:#5a2600; background: var(--st-warn); }
+  .b-activo { color:var(--good-text); border:1px solid var(--ring); }
+  .b-inact { color:var(--ink-muted); border:1px solid var(--grid); }
+  .b-nuevo { color:var(--s1); border:1px solid var(--s1); }
+  .b-sim { color:#fff; background: var(--s1); }
+  .tblwrap { max-height: 62vh; overflow:auto; border-radius: 8px; }
+  .note { font-size:11.5px; color:var(--ink-muted); margin-top:10px; line-height:1.5; }
+  .simbar { display:none; margin:0 0 12px; padding:10px 14px; border:1px solid var(--s1); border-radius:10px; font-size:13px; background:var(--surface-1); }
+  .simbar.on { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+  .chartbox { position:relative; }
+  .tip { position:absolute; pointer-events:none; background:var(--surface-1); border:1px solid var(--ring); box-shadow:0 2px 10px rgba(0,0,0,.12); border-radius:8px; padding:6px 10px; font-size:12px; display:none; white-space:nowrap; }
+  .pbar { height:6px; border-radius:3px; background:var(--grid); overflow:hidden; min-width:60px; }
+  .pbar > i { display:block; height:100%; background: var(--s1); }
+  #loading { padding:60px 0; text-align:center; color:var(--ink-muted); font-size:14px; }
+  .spin { display:inline-block; width:18px; height:18px; border:2px solid var(--grid); border-top-color:var(--s1); border-radius:50%; animation:sp 0.9s linear infinite; vertical-align:-4px; margin-right:8px; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  #errbox { display:none; margin:14px 0; padding:12px 14px; border:1px solid var(--st-crit); border-radius:10px; font-size:13px; }
+  @media (max-width: 720px){ td.desc{max-width:150px;} }
+</style>
+</head>
+<body>
+<div class="viz-root">
+  <header class="top">
+    <div>
+      <h1>Happy Food — Producción y stock</h1>
+      <div class="src">Lee pedidos y stock en vivo. Los pendientes se tildan en su pestaña: el plan cuenta como comprometido solo lo marcado.</div>
+    </div>
+    <div style="display:flex; gap:10px; align-items:center;">
+      <span id="conn" class="conn wait"><span class="dot"></span><span id="connTxt">cargando…</span></span>
+      <button class="btn" id="btnRef" onclick="load()">↻ Actualizar</button>
+    </div>
+  </header>
+
+  <div id="errbox"></div>
+  <div id="loading"><span class="spin"></span>Leyendo pedidos y stock, y recalculando el modelo…</div>
+
+  <div id="app" hidden>
+  <div class="simbar" id="simbar">
+    <span class="badge b-sim">SIMULANDO</span>
+    <span id="simtxt"></span>
+    <button class="btn primary" id="btnSave" onclick="guardar()">💾 Guardar selección</button>
+    <button class="btn" onclick="marcarTodos(true)">Tildar todos</button>
+    <span id="savemsg" style="color:var(--good-text); font-size:12px;"></span>
+  </div>
+  <div class="tiles" id="tiles"></div>
+
+  <nav class="tabs" id="tabs">
+    <button data-t="plan" class="on">Plan semanal</button>
+    <button data-t="pend">Pendientes ✓</button>
+    <button data-t="cli">Clientes</button>
+    <button data-t="mix">Cliente × SKU</button>
+    <button data-t="stk">Stock</button>
+    <button data-t="dem">Demanda histórica</button>
+  </nav>
+
+  <section class="panel" id="p-plan">
+    <div class="controls">
+      <input id="q-plan" type="search" placeholder="Buscar producto o código…">
+      <select id="f-estado"><option value="">Todos los estados</option></select>
+      <select id="f-abc"><option value="">ABC: todos</option><option>A</option><option>B</option><option>C</option></select>
+    </div>
+    <div class="tblwrap"><table id="t-plan"></table></div>
+    <div class="note">Producir = máx(0; política mínima − stock disponible). Disponible = stock útil − comprometido, donde <b>comprometido suma SOLO los pendientes tildados</b> en la pestaña Pendientes ✓ — destildá un pedido y el plan se recalcula al instante. El stock útil descuenta vencidos y suma semielaborado convertido. ⛔ CRÍTICO no cubre la venta esperada de la semana · ⚠️ INSUFICIENTE no cubre una semana pico · 🔶 AJUSTADO debajo de la política · ✅ SUFICIENTE · ↗ EXCEDENTE &gt;1,5× política.</div>
+  </section>
+
+  <section class="panel" id="p-pend" hidden>
+    <div class="controls">
+      <select id="f-pcli"><option value="">Todos los clientes</option></select>
+      <select id="f-psku"><option value="">Todos los SKUs</option></select>
+      <select id="f-pgrp"><option value="lin">Ver línea por línea</option><option value="sku">Agrupar por SKU (solo tildados)</option><option value="cli">Agrupar por cliente (solo tildados)</option></select>
+      <button class="btn" onclick="marcarTodos(true)">Tildar todos</button>
+      <button class="btn" onclick="marcarTodos(false)">Destildar todos</button>
+    </div>
+    <div class="tblwrap"><table id="t-pend"></table></div>
+    <div class="note">Órdenes PENDIENTE de los últimos 60 días. La columna ✓ decide si la línea cuenta como comprometido en el plan: destildala si ese pedido no se va a producir o querés simular sin él. <b>Guardar selección</b> deja la elección fija para la próxima vez que se abra el simulador (para todos); sin guardar, vale solo mientras la pestaña esté abierta. Las vistas agrupadas suman únicamente los tildados.</div>
+  </section>
+
+  <section class="panel" id="p-cli" hidden>
+    <div class="controls"><input id="q-cli" type="search" placeholder="Buscar cliente…"></div>
+    <div class="tblwrap"><table id="t-cli"></table></div>
+    <div class="note">P(pedido próx. semana) = 1 − e^(−tasa de pedidos semanal). «POR PEDIR» = pasó su cadencia habitual sin pedir. «INACTIVO» = más de 3 cadencias (o 6 semanas) sin pedir; no suma demanda esperada. «NUEVO» = menos de 12 semanas desde su primer pedido: probabilidad tentativa.</div>
+  </section>
+
+  <section class="panel" id="p-mix" hidden>
+    <div class="controls">
+      <select id="f-mcli"><option value="">Todos los clientes</option></select>
+      <select id="f-msku"><option value="">Todos los SKUs</option></select>
+    </div>
+    <div class="tblwrap"><table id="t-mix"></table></div>
+    <div class="note">P(pida este SKU) = 1 − e^(−tasa × % de sus pedidos que incluyen el SKU). E[bultos] = tasa × cantidad promedio por pedido.</div>
+  </section>
+
+  <section class="panel" id="p-stk" hidden>
+    <div class="controls"><input id="q-stk" type="search" placeholder="Buscar código o producto…"></div>
+    <div class="tblwrap"><table id="t-stk"></table></div>
+    <div class="note">Todos los códigos con movimiento, incluidos los semielaborados 1xxx/2xxx. «No entregable» = lotes con fecha límite de entrega vencida.</div>
+  </section>
+
+  <section class="panel" id="p-dem" hidden>
+    <div class="chartbox" id="chartbox">
+      <svg id="chart" width="100%" height="300" role="img" aria-label="Demanda doméstica total por semana, en bultos"></svg>
+      <div class="tip" id="tip"></div>
+    </div>
+    <div class="note" id="demnote">Bultos solicitados por semana (demanda doméstica, sin EXPO ni reclamos).</div>
+  </section>
+  </div>
+</div>
+
+<script>
+let D = null;
+let SKU = {};
+let EXCL = new Set();      // claves "op|cod" de pendientes DESTILDADOS (no cuentan como comprometido)
+let SAVED = new Set();     // última selección guardada en el servidor (para saber si hay cambios)
+
+const fmt = (n, d=0) => n==null ? "–" : n.toLocaleString("es-AR", {minimumFractionDigits:d, maximumFractionDigits:d});
+const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* ---------- carga ---------- */
+function load(){
+  const btn = document.getElementById("btnRef");
+  btn.disabled = true;
+  setConn("wait", "actualizando…");
+  if (!D) document.getElementById("loading").style.display = "block";
+  google.script.run
+    .withSuccessHandler(json => {
+      try { D = JSON.parse(json); }
+      catch(e){ return fail("Respuesta inválida del servidor: " + e.message); }
+      const faltan = ["plan","pend","clientes","pares","stockRows","serie"].filter(k => !Array.isArray(D[k]));
+      if (faltan.length) return fail("El servidor respondió sin las claves " + faltan.join(", ") +
+        ". El /exec está sirviendo una versión vieja: Implementar → Administrar implementaciones → ✏️ → Nueva versión.");
+      btn.disabled = false;
+      EXCL = new Set(D.excluded || []);
+      SAVED = new Set(D.excluded || []);
+      document.getElementById("loading").style.display = "none";
+      document.getElementById("errbox").style.display = "none";
+      document.getElementById("app").hidden = false;
+      setConn("live", "EN VIVO · " + D.ts + " · última orden " + D.ultimaOrden);
+      try { renderAll(); }
+      catch(e){ fail("Los datos llegaron pero falló el dibujo: " + e.message); }
+    })
+    .withFailureHandler(err => fail(err && err.message ? err.message : String(err)))
+    .getData();
+}
+function fail(msg){
+  document.getElementById("btnRef").disabled = false;
+  document.getElementById("loading").style.display = "none";
+  setConn("err", "ERROR");
+  const box = document.getElementById("errbox");
+  box.style.display = "block";
+  box.innerHTML = "<b>No se pudo leer los datos.</b> " + esc(msg);
+}
+function setConn(cls, txt){
+  document.getElementById("conn").className = "conn " + cls;
+  document.getElementById("connTxt").textContent = txt;
+}
+
+/* ---------- simulación: comprometidos según lo tildado ---------- */
+function compPorBase(){
+  const m = {};
+  for (const l of D.pend){
+    if (EXCL.has(l.key)) continue;
+    m[l.base] = (m[l.base] || 0) + l.cb;
+  }
+  for (const k in m) m[k] = Math.round(m[k]*10)/10;
+  return m;
+}
+const ORDEN = { "CRÍTICO":0, "INSUFICIENTE":1, "AJUSTADO":2, "SUFICIENTE":3, "EXCEDENTE":4, "ARMADO":6, "SIN DEMANDA":7 };
+function planRows(){
+  const COMP = compPorBase();
+  return D.plan.map(r => {
+    const comp = COMP[r.cod] || 0;
+    const disp = Math.round((r.util - comp)*10)/10;
+    let estado, prod = null, kgP = null;
+    if (r.esquema === "derived") estado = "ARMADO";
+    else if (!r.polMin) estado = "SIN DEMANDA";
+    else {
+      if (disp < r.e) estado = "CRÍTICO";
+      else if (disp < r.cont) estado = "INSUFICIENTE";
+      else if (disp < r.polMin) estado = "AJUSTADO";
+      else if (disp <= 1.5*r.polMin) estado = "SUFICIENTE";
+      else estado = "EXCEDENTE";
+      prod = Math.ceil(Math.max(0, r.polMin - disp));
+      kgP = r.kgU ? Math.round(prod*r.kgU*10)/10 : null;
+    }
+    const gap = (r.esquema==="derived"||!r.polMin) ? null : Math.max(0, Math.round((r.polMin - disp)*10)/10);
+    return {...r, comp, disp, estado, prod, kg:kgP, gap, orden: ORDEN[estado] != null ? ORDEN[estado] : 9};
+  });
+}
+function actualizarSim(){
+  const nEx = EXCL.size;
+  const kgEx = D.pend.filter(l=>EXCL.has(l.key)).reduce((s,l)=>s+l.cb,0);
+  const bar = document.getElementById("simbar");
+  const dirty = !(EXCL.size===SAVED.size && [...EXCL].every(k=>SAVED.has(k)));
+  bar.classList.toggle("on", nEx>0 || dirty);
+  document.getElementById("simtxt").textContent =
+    nEx ? `${nEx} línea${nEx>1?"s":""} de pendientes destildada${nEx>1?"s":""} (${fmt(kgEx,1)} bultos base fuera del comprometido)` :
+          "Todos los pendientes tildados.";
+  document.getElementById("btnSave").disabled = !dirty;
+  document.getElementById("savemsg").textContent = dirty ? "" : (nEx || SAVED.size ? "selección guardada" : "");
+}
+function toggle(key, on){
+  if (on) EXCL.delete(key); else EXCL.add(key);
+  renderTiles(); renderPlan(); renderPend(); actualizarSim();
+}
+function marcarTodos(on){
+  if (on) EXCL.clear();
+  else D.pend.forEach(l => EXCL.add(l.key));
+  renderTiles(); renderPlan(); renderPend(); actualizarSim();
+}
+function guardar(){
+  const btn = document.getElementById("btnSave");
+  btn.disabled = true; btn.textContent = "Guardando…";
+  google.script.run
+    .withSuccessHandler(n => {
+      SAVED = new Set(EXCL);
+      btn.textContent = "💾 Guardar selección";
+      actualizarSim();
+      document.getElementById("savemsg").textContent = "selección guardada ✓";
+    })
+    .withFailureHandler(err => {
+      btn.disabled = false; btn.textContent = "💾 Guardar selección";
+      alert("No se pudo guardar: " + (err && err.message ? err.message : err));
+    })
+    .saveExcluded(JSON.stringify([...EXCL]));
+}
+
+/* ---------- tiles ---------- */
+function renderTiles(){
+  const rows = planRows();
+  const crit = rows.filter(r=>r.estado==="CRÍTICO").length;
+  const insu = rows.filter(r=>r.estado==="INSUFICIENTE").length;
+  const prodB = rows.reduce((a,r)=>a+(r.prod||0),0);
+  const prodKg = rows.reduce((a,r)=>a+(r.kg||0),0);
+  const stockTot = rows.filter(r=>r.esquema!=="derived").reduce((a,r)=>a+Math.max(0,r.disp),0);
+  const compTot = rows.reduce((a,r)=>a+(r.comp||0),0);
+  const nEx = EXCL.size;
+  document.getElementById("tiles").innerHTML = `
+    <div class="tile crit"><div class="lbl">SKUs críticos</div><div class="val">${crit}</div><div class="sub">${insu} insuficientes</div></div>
+    <div class="tile"><div class="lbl">A producir</div><div class="val">${fmt(prodB)}</div><div class="sub">bultos esta semana</div></div>
+    <div class="tile"><div class="lbl">Equivalente</div><div class="val">${fmt(prodKg/1000,1)}</div><div class="sub">toneladas</div></div>
+    <div class="tile"><div class="lbl">Stock disponible</div><div class="val">${fmt(stockTot)}</div><div class="sub">bultos, netos de ${fmt(compTot, compTot%1?1:0)} comprometidos</div></div>
+    <div class="tile ${nEx?"sim":""}"><div class="lbl">Pendientes tildados</div><div class="val">${D.pend.length-nEx}/${D.pend.length}</div><div class="sub">${nEx?"simulando sin "+nEx+" línea"+(nEx>1?"s":""):"todos cuentan"}</div></div>`;
+}
+
+/* ---------- plan ---------- */
+let sortKey = "orden", sortAsc = true;
+const BADGE = {
+  "CRÍTICO":      ['b-crit','⛔'], "INSUFICIENTE": ['b-insu','⚠️'],
+  "AJUSTADO":     ['b-ajus','🔶'], "SUFICIENTE":  ['b-sufi','✅'],
+  "EXCEDENTE":    ['b-exce','↗'],  "ARMADO":      ['b-mut','🔧'], "SIN DEMANDA": ['b-mut','·'],
+};
+function renderPlan(){
+  const q = document.getElementById("q-plan").value.toLowerCase();
+  const fe = document.getElementById("f-estado").value;
+  const fa = document.getElementById("f-abc").value;
+  let rows = planRows().filter(r =>
+    (!q || r.desc.toLowerCase().includes(q) || String(r.cod).includes(q)) &&
+    (!fe || r.estado===fe) && (!fa || r.abc===fa));
+  rows.sort((a,b)=>{ const va=a[sortKey], vb=b[sortKey];
+    const c = (va==null)-(vb==null) || (va>vb)-(va<vb); return sortAsc? c : -c; });
+  const th = (lbl,key,num)=>`<th class="${num?'num':''}" data-k="${key}">${lbl}${sortKey===key?(sortAsc?" ↑":" ↓"):""}</th>`;
+  let h = "<thead><tr>"+th("Código","cod")+th("Producto","desc")+th("ABC","abc")
+    + th("Pol. actual","polAct",1)+th("Pol. mínima","polMin",1)+th("Contingencia","cont",1)
+    + th("Stock útil","util",1)+th("Comprometido ✓","comp",1)+th("Disponible","disp",1)+th("Dem. próx. sem.","e",1)+th("Gap","gap",1)
+    + th("Producir","prod",1)+th("kg","kg",1)+th("Estado","orden")+"</tr></thead><tbody>";
+  for (const r of rows){
+    const [cls, icon] = BADGE[r.estado] || ['b-mut','·'];
+    const est = r.estado==="ARMADO" ? `Armado a pedido (${r.base})` : r.estado;
+    h += `<tr class="${r.estado==="CRÍTICO"?"crit":""} ${r.esquema==="derived"?"derived":""}">
+      <td>${r.cod}</td><td class="desc" title="${esc(r.desc)}">${esc(r.desc)}</td><td>${r.abc}</td>
+      <td class="num">${fmt(r.polAct)}</td><td class="num"><b>${r.esquema==="derived"?"–":fmt(r.polMin)}</b></td>
+      <td class="num">${r.esquema==="derived"?"–":fmt(r.cont)}</td>
+      <td class="num">${fmt(r.util, r.util%1?1:0)}</td>
+      <td class="num">${r.comp?fmt(r.comp, r.comp%1?1:0):"–"}</td>
+      <td class="num"><b>${fmt(r.disp, r.disp%1?1:0)}</b></td><td class="num">${fmt(r.e,1)}</td>
+      <td class="num">${r.gap==null?"–":fmt(r.gap)}</td><td class="num"><b>${r.prod==null?"–":fmt(r.prod)}</b></td>
+      <td class="num">${r.kg==null?"–":fmt(r.kg)}</td>
+      <td><span class="badge ${cls}">${icon} ${est}</span></td></tr>`;
+  }
+  document.getElementById("t-plan").innerHTML = h+"</tbody>";
+  document.querySelectorAll("#t-plan th").forEach(el=>el.onclick=()=>{
+    const k = el.dataset.k; if (sortKey===k) sortAsc=!sortAsc; else {sortKey=k; sortAsc=true;} renderPlan();
+  });
+}
+
+/* ---------- pendientes con tildes ---------- */
+function renderPend(){
+  const fc = document.getElementById("f-pcli").value;
+  const fs = document.getElementById("f-psku").value;
+  const grp = document.getElementById("f-pgrp").value;
+  let rows = D.pend.filter(r => (!fc || r.cli===fc) && (!fs || String(r.base)===fs || String(r.cod)===fs));
+  let h = "";
+  if (grp === "lin"){
+    rows = [...rows].sort((a,b)=> a.op-b.op || a.cod-b.cod);
+    h = "<thead><tr><th>✓ Cuenta</th><th>N° OP</th><th>Fecha</th><th>Cliente</th><th>SKU</th><th>Producto</th><th class='num'>Solicitado</th><th>Sale del stock de</th><th class='num'>Bultos base</th></tr></thead><tbody>";
+    for (const r of rows){
+      const on = !EXCL.has(r.key);
+      h += `<tr class="${on?"":"excl"}">
+        <td class="chk"><input type="checkbox" ${on?"checked":""} onchange="toggle('${r.key}', this.checked)" title="${on?"Cuenta como comprometido":"Excluido del comprometido"}"></td>
+        <td>${r.op}</td><td>${r.fecha}</td><td>${esc(r.cli)}</td><td>${r.cod}</td>
+        <td class="desc" title="${esc(r.prod)}">${esc(r.prod)}</td><td class="num">${fmt(r.sol)}</td>
+        <td>${r.base!==r.cod?`<span class="badge b-mut">🔧 ${r.base}</span>`:r.base}</td>
+        <td class="num"><b>${fmt(r.cb, r.cb%1?1:0)}</b></td></tr>`;
+    }
+    const inc = rows.filter(r=>!EXCL.has(r.key));
+    h += `<tr><td></td><td><b>TOTAL ✓</b></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="num"><b>${fmt(inc.reduce((s,r)=>s+r.cb,0),1)}</b></td></tr>`;
+  } else {
+    rows = rows.filter(r=>!EXCL.has(r.key));
+    const key = grp==="sku" ? (r=>r.base) : (r=>r.cli);
+    const agg = {};
+    for (const r of rows){
+      const k = key(r);
+      const a = agg[k] || (agg[k]={k, cb:0, lineas:0, quien:new Set()});
+      a.cb += r.cb; a.lineas++; a.quien.add(grp==="sku" ? r.cli : r.base);
+    }
+    const list = Object.values(agg).sort((a,b)=>b.cb-a.cb);
+    const c1 = grp==="sku" ? "SKU base" : "Cliente";
+    const c3 = grp==="sku" ? "Clientes que lo esperan" : "SKUs base pedidos";
+    h = `<thead><tr><th>${c1}</th>${grp==="sku"?"<th>Producto</th>":""}<th class='num'>Líneas</th><th class='num'>Bultos comprometidos</th><th>${c3}</th></tr></thead><tbody>`;
+    for (const a of list){
+      const d = grp==="sku" ? SKU[a.k] : null;
+      h += `<tr><td><b>${esc(String(a.k))}</b></td>${grp==="sku"?`<td class="desc" title="${esc(d?d.desc:"")}">${esc(d?d.desc:"")}</td>`:""}
+        <td class="num">${a.lineas}</td><td class="num"><b>${fmt(a.cb, a.cb%1?1:0)}</b></td>
+        <td class="desc">${esc([...a.quien].join("; "))}</td></tr>`;
+    }
+    h += `<tr><td><b>TOTAL</b></td>${grp==="sku"?"<td></td>":""}<td class="num">${rows.length}</td><td class="num"><b>${fmt(list.reduce((s,a)=>s+a.cb,0),1)}</b></td><td></td></tr>`;
+  }
+  document.getElementById("t-pend").innerHTML = h + "</tbody>";
+}
+
+/* ---------- clientes ---------- */
+function renderCli(){
+  const q = document.getElementById("q-cli").value.toLowerCase();
+  const rows = D.clientes.filter(c=>!q||c.nombre.toLowerCase().includes(q));
+  let h = "<thead><tr><th>Cliente</th><th>Tipo</th><th class='num'>Pedidos</th><th>Último</th><th class='num'>Sem. desde últ.</th><th class='num'>Historia (sem)</th><th class='num'>Cadencia (sem)</th><th class='num'>P(próx. semana)</th><th></th><th>Situación</th><th>SKUs top</th></tr></thead><tbody>";
+  for (const c of rows){
+    const bc = c.sit==="POR PEDIR"?"b-porpedir":c.sit==="ACTIVO"?"b-activo":c.sit==="NUEVO"?"b-nuevo":"b-inact";
+    const nuevo = c.sit==="NUEVO";
+    h += `<tr><td>${esc(c.nombre)}</td><td>${esc(c.tipo)}</td><td class="num">${c.pedidos}</td>
+      <td>${c.ultimo}</td><td class="num">${fmt(c.semDesde,1)}</td>
+      <td class="num">${c.semHist==null?"–":fmt(c.semHist,1)}</td>
+      <td class="num">${nuevo||c.cadencia==null?"–":fmt(c.cadencia,1)}</td>
+      <td class="num">${nuevo?`<span style="color:var(--ink-muted)">~${fmt(c.p*100)}%</span>`:`<b>${fmt(c.p*100)}%</b>`}</td>
+      <td><div class="pbar"><i style="width:${Math.round(c.p*100)}%${nuevo?';opacity:.45':''}"></i></div></td>
+      <td><span class="badge ${bc}">${nuevo?"🌱 ":""}${c.sit}</span></td>
+      <td class="desc">${esc(c.skus)}</td></tr>`;
+  }
+  document.getElementById("t-cli").innerHTML = h+"</tbody>";
+}
+
+/* ---------- cliente × SKU ---------- */
+function renderMix(){
+  const fc = document.getElementById("f-mcli").value;
+  const fs = document.getElementById("f-msku").value;
+  const rows = D.pares.filter(r=>(!fc||r.cli===fc)&&(!fs||String(r.cod)===fs)).slice(0,250);
+  let h = "<thead><tr><th>Cliente</th><th>SKU</th><th>Producto</th><th class='num'>Veces</th><th class='num'>% de sus pedidos</th><th class='num'>Cant. típica</th><th>Última vez</th><th class='num'>P(lo pida)</th><th class='num'>E[bultos/sem]</th></tr></thead><tbody>";
+  for (const r of rows){
+    const d = SKU[r.cod];
+    h += `<tr><td>${esc(r.cli)}</td><td>${r.cod}</td><td class="desc" title="${esc(d?d.desc:"")}">${esc(d?d.desc:"")}</td>
+      <td class="num">${r.veces}/${r.nped}</td><td class="num">${fmt(r.pct*100)}%</td>
+      <td class="num">${fmt(r.qcp,1)}</td><td>${r.ult}</td>
+      <td class="num" style="${r.pSku>=0.5?'color:var(--good-text);font-weight:600':''}">${fmt(r.pSku*100)}%</td>
+      <td class="num"><b>${fmt(r.e,1)}</b></td></tr>`;
+  }
+  document.getElementById("t-mix").innerHTML = h+"</tbody>";
+}
+
+/* ---------- stock ---------- */
+function renderStockTab(){
+  const q = (document.getElementById("q-stk").value||"").toLowerCase();
+  let h = "<thead><tr><th>Código</th><th>Producto</th><th class='num'>CD</th><th class='num'>Planta</th><th class='num'>Tránsito</th><th class='num'>Total</th><th class='num'>No entregable</th><th class='num'>Útil</th><th>Semielaborado</th></tr></thead><tbody>";
+  for (const s of D.stockRows){
+    const name = s.desc || (SKU[s.cod] ? SKU[s.cod].desc : "");
+    if (q && !String(s.cod).includes(q) && !name.toLowerCase().includes(q)) continue;
+    let conv = "";
+    if (s.conv) conv = `<span class="badge b-mut">🔧 ÷${s.conv.div} → ${fmt(s.conv.equiv,1)} bultos de ${s.conv.target}</span>`;
+    else if (s.recibe && s.recibe.equiv) conv = `<span class="badge b-mut">incluye +${fmt(s.recibe.equiv,1)} equiv. de ${s.recibe.semi}</span>`;
+    h += `<tr class="${s.conv?"derived":""}"><td><b>${s.cod}</b></td><td class="desc" title="${esc(name)}">${esc(name)}</td>
+      <td class="num">${fmt(s.cd)}</td><td class="num">${fmt(s.pl)}</td><td class="num">${fmt(s.tr)}</td>
+      <td class="num">${fmt(s.tot)}</td><td class="num" style="${s.nod?'color:var(--st-crit)':''}">${fmt(s.nod)}</td>
+      <td class="num"><b>${fmt(s.util)}</b></td><td>${conv}</td></tr>`;
+  }
+  document.getElementById("t-stk").innerHTML = h + "</tbody>";
+}
+
+/* ---------- gráfico ---------- */
+function renderChart(){
+  const svg = document.getElementById("chart");
+  const W = svg.clientWidth || 900, H = 300, P = {t:16,r:16,b:28,l:44};
+  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  const d = D.serie, n = d.length;
+  if (!n) return;
+  const max = Math.ceil(Math.max(...d.map(p=>p.v))/100)*100 || 100;
+  const x = i => P.l + i*(W-P.l-P.r)/(n-1);
+  const y = v => H-P.b - v*(H-P.t-P.b)/max;
+  let g = "";
+  for (let v=0; v<=max; v+=max/4){
+    g += `<line x1="${P.l}" x2="${W-P.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)" stroke-width="1"/>
+          <text x="${P.l-6}" y="${y(v)+4}" text-anchor="end" font-size="10" fill="var(--ink-muted)">${fmt(v)}</text>`;
+  }
+  for (let i=0;i<n;i+=4) g += `<text x="${x(i)}" y="${H-8}" text-anchor="middle" font-size="10" fill="var(--ink-muted)">${d[i].sem}</text>`;
+  const path = d.map((p,i)=>`${i?"L":"M"}${x(i).toFixed(1)},${y(p.v).toFixed(1)}`).join("");
+  g += `<line x1="${P.l}" x2="${W-P.r}" y1="${y(0)}" y2="${y(0)}" stroke="var(--baseline)"/>`;
+  g += `<path d="${path}" fill="none" stroke="var(--s1)" stroke-width="2" stroke-linejoin="round"/>`;
+  g += `<line id="xh" y1="${P.t}" y2="${H-P.b}" stroke="var(--baseline)" stroke-dasharray="3,3" visibility="hidden"/>`;
+  g += `<circle id="dot" r="4" fill="var(--s1)" stroke="var(--surface-1)" stroke-width="2" visibility="hidden"/>`;
+  svg.innerHTML = g;
+  const tip = document.getElementById("tip"), box = document.getElementById("chartbox");
+  svg.onmousemove = ev => {
+    const r = svg.getBoundingClientRect();
+    const mx = (ev.clientX-r.left)*W/r.width;
+    const i = Math.max(0,Math.min(n-1, Math.round((mx-P.l)*(n-1)/(W-P.l-P.r))));
+    const xh = svg.querySelector("#xh"), dot = svg.querySelector("#dot");
+    xh.setAttribute("x1",x(i)); xh.setAttribute("x2",x(i)); xh.setAttribute("visibility","visible");
+    dot.setAttribute("cx",x(i)); dot.setAttribute("cy",y(d[i].v)); dot.setAttribute("visibility","visible");
+    tip.style.display="block";
+    tip.innerHTML = `<b>Sem. ${d[i].sem}</b> · ${fmt(d[i].v)} bultos`;
+    const bl = box.getBoundingClientRect();
+    tip.style.left = Math.min(bl.width-140, (ev.clientX-bl.left)+12)+"px";
+    tip.style.top = (ev.clientY-bl.top-36)+"px";
+  };
+  svg.onmouseleave = ()=>{ tip.style.display="none";
+    svg.querySelector("#xh").setAttribute("visibility","hidden");
+    svg.querySelector("#dot").setAttribute("visibility","hidden"); };
+}
+
+/* ---------- filtros ---------- */
+function fillSel(id, values){
+  const el = document.getElementById(id), v = el.value;
+  el.length = 1;
+  for (const [val, txt] of values){ const o=document.createElement("option"); o.value=val; o.textContent=txt; el.appendChild(o); }
+  el.value = v; if (el.selectedIndex < 0) el.selectedIndex = 0;
+}
+function initFilters(){
+  SKU = Object.fromEntries(D.plan.map(s=>[s.cod, s]));
+  const fe = document.getElementById("f-estado");
+  if (fe.length === 1)
+    ["CRÍTICO","INSUFICIENTE","AJUSTADO","SUFICIENTE","EXCEDENTE","ARMADO","SIN DEMANDA"].forEach(e=>{
+      const o=document.createElement("option"); o.textContent=e; fe.appendChild(o); });
+  const skuOpt = s => [String(s.cod), s.cod+" – "+String(s.desc).slice(0,40)];
+  fillSel("f-mcli", [...new Set(D.pares.map(p=>p.cli))].sort().map(c=>[c,c]));
+  fillSel("f-msku", D.plan.filter(s=>s.abc!=="-").map(skuOpt));
+  fillSel("f-pcli", [...new Set(D.pend.map(r=>r.cli))].sort().map(c=>[c,c]));
+  fillSel("f-psku", [...new Set(D.pend.map(r=>r.base))].sort((a,b)=>a-b)
+    .map(c=>[String(c), c+" – "+(SKU[c]?String(SKU[c].desc).slice(0,38):"")]));
+  document.getElementById("demnote").textContent =
+    "Bultos solicitados por semana (demanda doméstica, sin EXPO ni reclamos). Última orden cargada: " + D.ultimaOrden + ".";
+}
+function renderAll(){
+  initFilters();
+  renderTiles(); renderPlan(); renderPend(); renderCli(); renderMix(); renderStockTab(); actualizarSim();
+  if (!document.getElementById("p-dem").hidden) renderChart();
+}
+
+/* ---------- init ---------- */
+(function(){
+  ["q-plan","f-estado","f-abc"].forEach(id=>document.getElementById(id).addEventListener("input",renderPlan));
+  document.getElementById("q-cli").addEventListener("input",renderCli);
+  document.getElementById("q-stk").addEventListener("input",renderStockTab);
+  ["f-mcli","f-msku"].forEach(id=>document.getElementById(id).addEventListener("input",renderMix));
+  ["f-pcli","f-psku","f-pgrp"].forEach(id=>document.getElementById(id).addEventListener("input",renderPend));
+  document.getElementById("tabs").addEventListener("click", ev=>{
+    const b = ev.target.closest("button"); if(!b) return;
+    document.querySelectorAll("#tabs button").forEach(x=>x.classList.toggle("on",x===b));
+    ["plan","pend","cli","mix","stk","dem"].forEach(t=>document.getElementById("p-"+t).hidden = b.dataset.t!==t);
+    if (b.dataset.t==="dem") renderChart();
+  });
+  window.addEventListener("resize", ()=>{ if(!document.getElementById("p-dem").hidden) renderChart(); });
+  load();
+})();
+</script>
+</body>
+</html>
