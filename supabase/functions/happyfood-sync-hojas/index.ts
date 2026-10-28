@@ -77,11 +77,16 @@ async function tokenGoogle(): Promise<string> {
 }
 
 // ---------- lectura
+// Celda de relleno: vacia o solo guiones/espacios ("-", " - -"), como las que dejan las formulas
+// arrastradas hasta el final de la hoja (Control de stock-KG tiene ~50.000 filas asi).
+const esRelleno = (v: Celda) => v === null || (typeof v === "string" && /^[\s-]*$/.test(v));
+
 function limpiar(filas: Celda[][]): Celda[][] {
   const out = filas.map((f) => (f || []).map((v) => (v === "" || v === undefined ? null : v)));
-  // quitar filas vacias del final y columnas vacias del final de cada fila
+  // quitar columnas vacias del final de cada fila
   for (const f of out) while (f.length && f[f.length - 1] === null) f.pop();
-  while (out.length && out[out.length - 1].length === 0) out.pop();
+  // quitar filas de relleno del final (las del medio se conservan: la numeracion no cambia)
+  while (out.length && out[out.length - 1].every(esRelleno)) out.pop();
   return out;
 }
 
