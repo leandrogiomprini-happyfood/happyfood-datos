@@ -8,7 +8,7 @@
 --   on conflict (insumo_codigo) do update set modo = 'inactivo', motivo = excluded.motivo;
 --   select calc.refrescar_insumos();
 -- Para reactivarlo: update core.insumos_config set modo = 'regular' where insumo_codigo = 123;
--- Se puede volver a ejecutar sin riesgo.
+-- Se puede volver a ejecutar sin riesgo mientras no se haya corrido la 023 (despues, re-correr 023 y 024).
 
 alter table core.insumos_config drop constraint if exists insumos_config_modo_check;
 alter table core.insumos_config add constraint insumos_config_modo_check
