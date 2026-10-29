@@ -75,3 +75,21 @@ Más las de los datos de Compras: la columna "RECEPCION - Cant" mezcla unidad de
 - Nombres distintos para el mismo código en las tres planillas (30 = Tocoferol, en Compras "BHT").
 - Códigos de insumo de Tekno (0000001…) distintos de los de Compras (9 = Almidón): hay que mapearlos
   si se quiere cruzar con las facturas de compra de Tekno.
+
+## Estado al 29/10/2026
+
+Hecho y funcionando solo (migraciones 012 a 026):
+- 19 pestañas de Google leidas cada 30 min (Edge Function happyfood-sync-hojas, cuenta de servicio de Google).
+- Vistas core: insumos, proveedores, OC (con correccion kg/bolsas), produccion por seccion, masas, plan,
+  recetas, conteo (sumado por lugar), stock de PT, pedidos, envases.
+- Stock de insumos: conteo + recepciones - consumo medido; lead time p80; prevision dia por dia con el plan
+  (factor acotado 0,8-1,6 en ingredientes); resultado en rpt.stock_insumos, recalculado a los :10 y :40.
+- Estados: columna AK de Control Stock de Insumos + core.insumos_config (manda lo cargado a mano);
+  reemplazos en core.insumos_reemplazo (16 -> 17 desde el 29/10; borrar a fines de diciembre).
+- Looker: informe "HappyFood · Insumos" con reporte_stock_insumos, reporte_insumos_pedir,
+  reporte_oc_pendientes y reporte_estado_insumos.
+- Validado contra planta el 28/10: 4 de 5 criticos confirmados (116, bandejas Talitas, flexible Talita
+  clasica 246, esencia de jamon); el quinto (DDL diet) era un cambio de plan no cargado.
+
+Pendiente en planillas (lo corrige el equipo): 9001 descripcion X45GR en Tekno; hoja KG: bandeja 17 en
+familiares; columna AK: 224/225 Activo, 16 Inactivo; Compras: estado de 184 (se usa) y codigos 125/126.
