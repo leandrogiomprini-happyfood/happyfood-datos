@@ -15,18 +15,18 @@
 --     horas_sin_descanso = sin el descanso (solo dias con 4 marcas);
 --   * horas teoricas: 8 de lunes a viernes, 4 el sabado; extra_aprox = horas en planta por encima
 --     de las teoricas (es tiempo dentro de la planta, no horas extra autorizadas).
--- Los IDs de las dos planillas van en la seccion 1. Se puede volver a ejecutar sin riesgo.
+-- El maestro se carga aca; el archivo de marcas (fichadas) se suma en la 048 cuando este en Drive. Se puede volver a ejecutar sin riesgo.
 
 set statement_timeout = '10min';
 
 -- 1. Planillas (IDs de Drive) y fila de encabezado.
 insert into hojas.fuentes (fuente, planilla_id, hoja, tipo, descripcion, cada_minutos) values
-  ('personal_maestro', 'ID_MAESTRO', 'Personal', 'sheet', 'Maestro de personal: rol, sector, cuenta para produccion', 360),
-  ('fichadas',         'ID_FICHADAS', 'Hoja1', 'xlsx', 'Marcas del reloj facial (export manual, acumulado del año)', 360)
+  ('personal_maestro', '1XQvxyg5T9Wq3Xh6TodBuf1P8eojgi4Fy', 'Personal', 'xlsx',
+   'Maestro de personal (Personal_maestro_v2.xlsx): rol, sector, cuenta para produccion, asistencia', 60)
 on conflict (fuente) do update set planilla_id = excluded.planilla_id, hoja = excluded.hoja, tipo = excluded.tipo,
   descripcion = excluded.descripcion, cada_minutos = excluded.cada_minutos;
 
-insert into hojas.encabezados (fuente, fila_encabezado) values ('personal_maestro', 1), ('fichadas', 1)
+insert into hojas.encabezados (fuente, fila_encabezado) values ('personal_maestro', 1)
 on conflict (fuente) do update set fila_encabezado = excluded.fila_encabezado;
 
 -- Fecha en texto: dd/mm/aaaa (planilla) o aaaa-mm-dd (export del reloj).
@@ -39,7 +39,15 @@ declare
   t text;
   m text[];
 begin
-  if v is null or jsonb_typeof(v) <> 'string' then return null; end if;
+  if v is null then return null; end if;
+  -- Excel guarda las fechas como numero de dias desde 30/12/1899 (el xlsx se lee sin formato).
+  if jsonb_typeof(v) = 'number' then
+    if (v #>> '{}')::numeric between 36526 and 73051 then
+      return timestamp '1899-12-30' + make_interval(secs => ((v #>> '{}')::numeric * 86400)::double precision);
+    end if;
+    return null;
+  end if;
+  if jsonb_typeof(v) <> 'string' then return null; end if;
   t := btrim(v #>> '{}');
   m := regexp_match(t, '^(\d{4})-(\d{1,2})-(\d{1,2})[ T]?(\d{1,2})?:?(\d{2})?:?(\d{2})?');
   if m is not null then
@@ -186,3 +194,9 @@ revoke all on core.personal, core.fichadas, calc.asistencia_dia from anon, authe
 revoke all on public.reporte_asistencia, public.reporte_ausencias, public.reporte_dotacion_dia
   from anon, authenticated, public;
 grant select on public.reporte_asistencia, public.reporte_ausencias, public.reporte_dotacion_dia to looker_lectura;
+
+-- 6. Leer el maestro ahora y controlar.
+select hojas.disparar();
+select 'personas en el maestro (puede tardar 1-2 min en llenarse; volver a correr esta consulta)' as que,
+       (select count(*) from core.personal)::text as valor
+union all select 'error de lectura del maestro', coalesce(ultimo_error, 'ninguno') from hojas.fuentes where fuente = 'personal_maestro';
