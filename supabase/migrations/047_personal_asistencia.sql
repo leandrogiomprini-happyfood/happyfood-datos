@@ -3,7 +3,7 @@
 -- cruzada con produccion, quien vino y su rol, y horas extra aproximadas.
 -- Fuentes (Google Drive, compartidas como Lector con la cuenta de servicio):
 --   personal_maestro  hoja "Personal" del maestro que completa Cuci (ID reloj, nombre, rol, sector,
---                     cuenta para produccion, activo, fecha de egreso)
+--                     cuenta para produccion, activo, fecha de egreso, Asistencia: Diaria / A demanda)
 --   fichadas          export del reloj facial (xlsx, hoja "Hoja1"), acumulado del año. Se exporta a
 --                     mano y se sube como NUEVA VERSION del mismo archivo (asi no cambia el ID).
 -- Reglas de las marcas (el reloj no dice si es entrada o salida, todas dicen "In"):
@@ -66,7 +66,8 @@ select hojas.txt(datos -> 'ID reloj')                                   as id_re
        lower(coalesce(hojas.txt(datos -> 'Cuenta para producción'), '')) in ('sí', 'si', 's')   as cuenta_produccion,
        lower(coalesce(hojas.txt(datos -> 'Activo'), 'sí')) not in ('no', 'n')                    as activo,
        hojas.fecha_hora(datos -> 'Fecha de egreso')::date               as fecha_egreso,
-       hojas.txt(datos -> 'Comentario')                                 as comentario
+       hojas.txt(datos -> 'Comentario')                                 as comentario,
+       coalesce(lower(hojas.txt(datos -> 'Asistencia')), 'diaria') like '%demanda%' as a_demanda
 from hojas.tabla
 where fuente = 'personal_maestro' and hojas.txt(datos -> 'ID reloj') is not null;
 
@@ -133,6 +134,8 @@ select a.*, case when a.extra_aprox >= 0.5 then 'Sí' else 'No' end as extra_mas
 from calc.asistencia_dia a;
 
 -- 5b. Ausencias: dias habiles de la planta (con al menos 3 personas) en que una persona activa no marco.
+--     Quien tiene Asistencia = "A demanda" en el maestro (centro de distribucion que viene a dar soporte)
+--     no genera ausencias; cuando viene, suma en la dotacion como cualquiera.
 create or replace view public.reporte_ausencias as
 with habiles as (
   select fecha from core.fichadas group by fecha having count(distinct id_reloj) >= 3
@@ -141,6 +144,7 @@ with habiles as (
          min(f.fecha) as alta, coalesce(p.fecha_egreso, max(f.fecha)) as baja
   from core.personal p
   join core.fichadas f on f.id_reloj = p.id_reloj
+  where not p.a_demanda
   group by p.id_reloj, p.nombre, p.rol, p.cuenta_produccion, p.fecha_egreso
 )
 select h.fecha, date_trunc('month', h.fecha)::date as mes, extract(isodow from h.fecha)::int as dia_semana,
